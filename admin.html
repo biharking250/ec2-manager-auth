@@ -138,16 +138,25 @@ function parseUsers(csv) {
     line = line.trim();
     if (!line) return;
     var parts = line.split(':');
+    // Valid line mein minimum 7 parts hone chahiye (pass + 6 MAC octets)
     if (parts.length < 7) return;
+    // Password valid hona chahiye — sirf letters/numbers
     var password = parts[0].trim();
+    if (!password || password.length < 2) return;
+    // MAC validate karo — parts[1] to parts[6] hex hone chahiye
+    var macParts = parts.slice(1, 7);
+    var validMac = macParts.every(function(p) {
+      return p.trim().match(/^[0-9A-Fa-f]{1,2}$/);
+    });
+    if (!validMac) return;
     var expiry = null;
-    var mac = '';
-    var lastPart = parts[parts.length - 1].trim();
-    if (lastPart.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      expiry = lastPart;
-      mac = parts.slice(1, parts.length - 1).join(':').toUpperCase().trim();
-    } else {
-      mac = parts.slice(1).join(':').toUpperCase().trim();
+    var mac = macParts.join(':').toUpperCase().trim();
+    // Check last part for date
+    if (parts.length >= 8) {
+      var lastPart = parts[7].trim();
+      if (lastPart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        expiry = lastPart;
+      }
     }
     users.push({ password: password, mac: mac, expiry: expiry });
   });
@@ -240,7 +249,7 @@ function renderTable(users) {
 
     return '<tr>' +
       '<td style="color:#888;font-size:.8rem">' + (i + 1) + '</td>' +
-      '<td><span style="background:linear-gradient(135deg,#ff9900,#e05c00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700">' + u.password + '</span></td>' +
+      '<td><span style="color:#ff9900;font-weight:700">' + u.password + '</span></td>' +
       '<td><span class="mac-code">' + u.mac + '</span></td>' +
       '<td>' + formatDate(u.expiry) + '<br>' + daysHtml + progress + '</td>' +
       '<td>' + statusHtml + '</td>' +
