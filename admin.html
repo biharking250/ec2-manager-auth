@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>EC2 Manager — Admin Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#0f1117;color:#e0e0e0;min-height:100vh}
+header{background:linear-gradient(135deg,#1a1f2e,#232b3e);padding:18px 32px;border-bottom:1px solid #2d3748;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:1.3rem;color:#ff9900;font-weight:800}
+header .sub{font-size:.72rem;color:#ff9900;letter-spacing:2px;margin-top:2px}
+.badge-live{background:#1a0000;border:1px solid #e53e3e;border-radius:20px;padding:4px 14px;font-size:.78rem;color:#fc8181;font-weight:700;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.main{padding:28px 32px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stat-card{background:#1a1f2e;border:1px solid #2d3748;border-radius:12px;padding:20px;text-align:center}
+.stat-num{font-size:2rem;font-weight:800;margin-bottom:4px}
+.stat-label{font-size:.78rem;color:#888;text-transform:uppercase;letter-spacing:.8px}
+.stat-total .stat-num{color:#ff9900}
+.stat-active .stat-num{color:#48bb78}
+.stat-expired .stat-num{color:#fc8181}
+.stat-expiring .stat-num{color:#ed8936}
+.card{background:#1a1f2e;border:1px solid #2d3748;border-radius:12px;padding:24px;margin-bottom:24px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.card-title{font-size:.9rem;color:#ff9900;font-weight:700;text-transform:uppercase;letter-spacing:1.5px}
+.btn-refresh{background:#232b3e;border:1px solid #2d3748;border-radius:8px;padding:7px 16px;color:#aaa;font-size:.8rem;cursor:pointer;transition:all .2s}
+.btn-refresh:hover{background:#2d3748;color:#fff}
+table{width:100%;border-collapse:collapse}
+thead tr{background:#232b3e}
+th{padding:12px 16px;text-align:left;color:#aaa;font-size:.78rem;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid #2d3748}
+td{padding:14px 16px;border-bottom:1px solid #1e2535;font-size:.88rem}
+tr:hover td{background:#1e2535}
+.status-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:700}
+.status-active{background:#1a4731;color:#48bb78;border:1px solid rgba(72,187,120,.3)}
+.status-expired{background:#3d1a1a;color:#fc8181;border:1px solid rgba(252,129,129,.3)}
+.status-expiring{background:#3d2a00;color:#ed8936;border:1px solid rgba(237,137,54,.3)}
+.mac-code{font-family:monospace;font-size:.82rem;color:#63b3ed;background:rgba(99,179,237,.1);padding:2px 8px;border-radius:6px}
+.days-badge{font-size:.78rem;font-weight:700}
+.days-ok{color:#48bb78}
+.days-warn{color:#ed8936}
+.days-danger{color:#fc8181}
+.empty{text-align:center;color:#555;padding:40px;font-size:.9rem}
+.loader{text-align:center;padding:40px;color:#555}
+.spinner{display:inline-block;width:24px;height:24px;border:3px solid #2d3748;border-top-color:#ff9900;border-radius:50%;animation:spin .7s linear infinite;margin-bottom:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress-bar{height:4px;background:#2d3748;border-radius:2px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;border-radius:2px;transition:width .5s}
+.last-refresh{font-size:.72rem;color:#555;margin-top:4px}
+.add-section{background:#1a1f2e;border:1px solid #2d3748;border-radius:12px;padding:24px;margin-bottom:24px}
+.add-title{font-size:.9rem;color:#ff9900;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:16px}
+.form-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:end}
+.form-group label{font-size:.75rem;color:#888;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.6px}
+.form-group input,.form-group select{width:100%;background:#0f1117;border:1px solid #2d3748;border-radius:8px;padding:10px 12px;color:#e0e0e0;font-size:.88rem;outline:none}
+.form-group input:focus,.form-group select:focus{border-color:#ff9900}
+.btn-add{background:#ff9900;color:#000;border:none;border-radius:8px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:.88rem;white-space:nowrap}
+.btn-add:hover{background:#e68a00}
+.copy-line{background:#0f1117;border:1px solid #2d3748;border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.85rem;color:#63b3ed;margin-top:12px;display:flex;align-items:center;justify-content:space-between}
+.btn-copy{background:rgba(99,179,237,.15);border:1px solid rgba(99,179,237,.3);border-radius:6px;padding:4px 12px;color:#63b3ed;font-size:.75rem;cursor:pointer}
+.footer{text-align:center;padding:24px;color:#444;font-size:.78rem;border-top:1px solid #1e2535;margin-top:20px}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🛡️ EC2 Manager — Admin Dashboard</h1>
+    <div class="sub">RUDRA &copy; 2026 &nbsp;|&nbsp; Live User Management</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="badge-live">● LIVE</div>
+    <div class="last-refresh" id="lastRefresh">Loading...</div>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card stat-total"><div class="stat-num" id="statTotal">—</div><div class="stat-label">Total Users</div></div>
+    <div class="stat-card stat-active"><div class="stat-num" id="statActive">—</div><div class="stat-label">Active</div></div>
+    <div class="stat-card stat-expiring"><div class="stat-num" id="statExpiring">—</div><div class="stat-label">Expiring Soon</div></div>
+    <div class="stat-card stat-expired"><div class="stat-num" id="statExpired">—</div><div class="stat-label">Expired</div></div>
+  </div>
+
+  <!-- Generate Entry -->
+  <div class="add-section">
+    <div class="add-title">➕ Generate New User Entry</div>
+    <div class="form-row">
+      <div class="form-group"><label>Password</label><input id="genPass" type="text" placeholder="e.g. Suresh123"/></div>
+      <div class="form-group"><label>MAC Address</label><input id="genMac" type="text" placeholder="AA:BB:CC:DD:EE:FF"/></div>
+      <div class="form-group">
+        <label>Validity</label>
+        <select id="genValidity">
+          <option value="30">1 Month</option>
+          <option value="90">3 Months</option>
+          <option value="180">6 Months</option>
+          <option value="365">1 Year</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Custom Expiry</label><input id="genDate" type="date"/></div>
+      <button class="btn-add" onclick="generateEntry()">Generate</button>
+    </div>
+    <div id="generatedLine" style="display:none">
+      <div class="copy-line">
+        <span id="generatedText"></span>
+        <button class="btn-copy" onclick="copyGenerated()">📋 Copy</button>
+      </div>
+      <div style="font-size:.75rem;color:#888;margin-top:6px">⬆️ Yeh line Google Sheets mein paste karo</div>
+    </div>
+  </div>
+
+  <!-- Users Table -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">👥 All Users</div>
+      <button class="btn-refresh" onclick="loadData()">🔄 Refresh</button>
+    </div>
+    <div id="tableContainer">
+      <div class="loader"><div class="spinner"></div><br>Loading users...</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  EC2 Instance Manager Admin Panel &mdash; RUDRA &copy; 2026 &nbsp;|&nbsp;
+  <a href="https://t.me/MR_RUDRA_OFFICIAL" target="_blank" style="color:#0088cc;text-decoration:none">📢 Join Group</a> &nbsp;|&nbsp;
+  <a href="https://t.me/MR_RUDRA_BHAI" target="_blank" style="color:#9f7aea;text-decoration:none">💬 @MR_RUDRA_BHAI</a>
+</div>
+
+<script>
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRvGtdF3mKnmKQw8wmoFJHKPNELFEJ5_jeNLzHAImZCufZOuywKDZJuFeuLfF8vYQ0ygUBoPwF4h0Yk/pub?output=csv';
+
+function parseUsers(csv) {
+  var users = [];
+  csv.split('\n').forEach(function(line) {
+    line = line.trim();
+    if (!line) return;
+    var parts = line.split(':');
+    if (parts.length < 7) return;
+    var password = parts[0].trim();
+    var expiry = null;
+    var mac = '';
+    var lastPart = parts[parts.length - 1].trim();
+    if (lastPart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      expiry = lastPart;
+      mac = parts.slice(1, parts.length - 1).join(':').toUpperCase().trim();
+    } else {
+      mac = parts.slice(1).join(':').toUpperCase().trim();
+    }
+    users.push({ password: password, mac: mac, expiry: expiry });
+  });
+  return users;
+}
+
+function getDaysLeft(expiry) {
+  if (!expiry) return null;
+  var today = new Date();
+  today.setHours(0,0,0,0);
+  var exp = new Date(expiry);
+  exp.setHours(0,0,0,0);
+  return Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  var d = new Date(dateStr);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function loadData() {
+  document.getElementById('tableContainer').innerHTML = '<div class="loader"><div class="spinner"></div><br>Loading users...</div>';
+  
+  fetch(SHEET_URL + '?t=' + Date.now())
+    .then(function(r) { return r.text(); })
+    .then(function(csv) {
+      var users = parseUsers(csv);
+      renderTable(users);
+      updateStats(users);
+      var now = new Date();
+      document.getElementById('lastRefresh').textContent = 'Last updated: ' + now.toLocaleTimeString('en-IN');
+    })
+    .catch(function() {
+      document.getElementById('tableContainer').innerHTML = '<div class="empty">❌ Failed to load data. Check internet connection.</div>';
+    });
+}
+
+function updateStats(users) {
+  var total = users.length;
+  var active = 0, expired = 0, expiring = 0;
+  users.forEach(function(u) {
+    var days = getDaysLeft(u.expiry);
+    if (days === null) { active++; return; }
+    if (days < 0) expired++;
+    else if (days <= 30) { expiring++; active++; }
+    else active++;
+  });
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statActive').textContent = active;
+  document.getElementById('statExpiring').textContent = expiring;
+  document.getElementById('statExpired').textContent = expired;
+}
+
+function renderTable(users) {
+  if (!users.length) {
+    document.getElementById('tableContainer').innerHTML = '<div class="empty">No users found. Add users in Google Sheets.</div>';
+    return;
+  }
+
+  var rows = users.map(function(u, i) {
+    var days = getDaysLeft(u.expiry);
+    var statusHtml = '';
+    var daysHtml = '';
+    var progress = '';
+
+    if (days === null) {
+      statusHtml = '<span class="status-badge status-active">✅ Active (No Expiry)</span>';
+      daysHtml = '<span class="days-ok">∞ Unlimited</span>';
+    } else if (days < 0) {
+      statusHtml = '<span class="status-badge status-expired">❌ Expired</span>';
+      daysHtml = '<span class="days-danger">Expired ' + Math.abs(days) + ' days ago</span>';
+      progress = '<div class="progress-bar"><div class="progress-fill" style="width:100%;background:#fc8181"></div></div>';
+    } else if (days <= 7) {
+      statusHtml = '<span class="status-badge status-expiring">⏰ Expiring Soon</span>';
+      daysHtml = '<span class="days-danger">' + days + ' days left</span>';
+      var pct = Math.round((days / 30) * 100);
+      progress = '<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%;background:#fc8181"></div></div>';
+    } else if (days <= 30) {
+      statusHtml = '<span class="status-badge status-expiring">📅 Expiring</span>';
+      daysHtml = '<span class="days-warn">' + days + ' days left</span>';
+      var pct2 = Math.round((days / 365) * 100);
+      progress = '<div class="progress-bar"><div class="progress-fill" style="width:'+pct2+'%;background:#ed8936"></div></div>';
+    } else {
+      statusHtml = '<span class="status-badge status-active">✅ Active</span>';
+      daysHtml = '<span class="days-ok">' + days + ' days left</span>';
+      var pct3 = Math.min(100, Math.round((days / 365) * 100));
+      progress = '<div class="progress-bar"><div class="progress-fill" style="width:'+pct3+'%;background:#48bb78"></div></div>';
+    }
+
+    return '<tr>' +
+      '<td style="color:#888;font-size:.8rem">' + (i + 1) + '</td>' +
+      '<td><span style="background:linear-gradient(135deg,#ff9900,#e05c00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700">' + u.password + '</span></td>' +
+      '<td><span class="mac-code">' + u.mac + '</span></td>' +
+      '<td>' + formatDate(u.expiry) + '<br>' + daysHtml + progress + '</td>' +
+      '<td>' + statusHtml + '</td>' +
+    '</tr>';
+  }).join('');
+
+  document.getElementById('tableContainer').innerHTML =
+    '<table>' +
+    '<thead><tr><th>#</th><th>Password</th><th>MAC Address</th><th>Expiry</th><th>Status</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody>' +
+    '</table>';
+}
+
+// Generate entry
+function generateEntry() {
+  var pass = document.getElementById('genPass').value.trim();
+  var mac  = document.getElementById('genMac').value.trim().toUpperCase();
+  var days = parseInt(document.getElementById('genValidity').value);
+  var customDate = document.getElementById('genDate').value;
+
+  if (!pass || !mac) { alert('Password aur MAC zaroori hai!'); return; }
+
+  var expiry = '';
+  if (customDate) {
+    expiry = customDate;
+  } else {
+    var d = new Date();
+    d.setDate(d.getDate() + days);
+    expiry = d.toISOString().split('T')[0];
+  }
+
+  var line = pass + ':' + mac + ':' + expiry;
+  document.getElementById('generatedText').textContent = line;
+  document.getElementById('generatedLine').style.display = 'block';
+}
+
+function copyGenerated() {
+  var text = document.getElementById('generatedText').textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    var btn = document.querySelector('.btn-copy');
+    btn.textContent = '✅ Copied!';
+    setTimeout(function() { btn.textContent = '📋 Copy'; }, 2000);
+  });
+}
+
+// Auto refresh every 30 seconds
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>
